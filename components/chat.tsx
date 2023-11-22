@@ -32,11 +32,20 @@ export function Chat({ id, initialMessages, className }: ChatProps) {
     'ai-token',
     null
   )
+
+  //set initial input the
+  var initialInput: string = "";
+  if(!initialMessages || initialMessages?.length == 0)
+  {
+    initialInput = "Hey Stratum, meet ____. They are a ____ year old _____ who’s email address is _____, phone number is _______, and home address is _____. They filled out the Stratum onboarding questionnaire and their answers from the form suggest they have the following skin tags: _______. Introduce yourself to them as their personal skincare assistant."
+  }
+
   const [previewTokenDialog, setPreviewTokenDialog] = useState(IS_PREVIEW)
   const [previewTokenInput, setPreviewTokenInput] = useState(previewToken ?? '')
   const { messages, append, reload, stop, isLoading, input, setInput } =
     useChat({
       initialMessages,
+      initialInput,
       id,
       body: {
         id,
@@ -48,6 +57,7 @@ export function Chat({ id, initialMessages, className }: ChatProps) {
         }
       }
     })
+
   return (
     <>
       <div className={cn('pb-[200px] pt-4 md:pt-10', className)}>

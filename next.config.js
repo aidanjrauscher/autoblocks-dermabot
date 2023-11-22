@@ -4,6 +4,10 @@ module.exports = {
   experimental: {
     serverActions: true,
   },
+  webpack: (config) => {
+    config.resolve.fallback = { fs: false, child_process: false };
+    return config;
+  },
   images: {
     remotePatterns: [
       {

@@ -3,9 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { kv } from '@vercel/kv'
-
 import { auth } from '@/auth'
 import { type Chat } from '@/lib/types'
+import { OpenAIApi } from 'openai-edge'
 
 export async function getChats(userId?: string | null) {
   if (!userId) {
@@ -23,7 +23,6 @@ export async function getChats(userId?: string | null) {
     }
 
     const results = await pipeline.exec()
-
     return results as Chat[]
   } catch (error) {
     return []
@@ -32,11 +31,11 @@ export async function getChats(userId?: string | null) {
 
 export async function getChat(id: string, userId: string) {
   const chat = await kv.hgetall<Chat>(`chat:${id}`)
-
-  if (!chat || (userId && chat.userId !== userId)) {
+  if (!chat || (userId && chat.userId != userId)) {
     return null
   }
-
+  //filter out system prompt
+  chat.messages = chat.messages.filter(m => m.role != "system")
   return chat
 }
 
@@ -117,4 +116,41 @@ export async function shareChat(chat: Chat) {
   await kv.hmset(`chat:${chat.id}`, payload)
 
   return payload
+}
+
+export async function ExtractChatName(prompt: string){
+  return ""
+}
+
+export async function ExtractChatTags(openai: OpenAIApi, prompt: string){
+  const messages : any = [
+    {
+      content: 
+      `
+      Given a string, introducing you to a new user, return a comma-separated list of the tags used to describe them. If you cannot find any such tags, return 'null'.
+
+      For example, given the input: 
+      ‘Hey Stratum, meet John. They are a 24 year old male who’s email address is johnsmith@gmail.com, phone number is 867-5309, and home address is 1234 Main Street Drive. They filled out the Stratum onboarding questionnaire and their answers from the form suggest they have the following skin tags: Fair, Dry, and Mild Sensitive. Introduce yourself to them as their personal skincare assistant.’
+      
+      You should return: 
+      Fair, Dry, Mild Sensitive
+
+      Remember, if the string includes no valid tags, return 'null'.
+      `,
+      role: 'system'
+    },
+    {
+      content: prompt,
+      role: 'user'
+    }
+  ]
+
+  const res = await openai.createChatCompletion({
+    model: 'gpt-3.5-turbo',
+    messages,
+    temperature: 0.3,
+  })
+
+  const data = await res.json()
+  return data.choices[0].message.content
 }

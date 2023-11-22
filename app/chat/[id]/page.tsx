@@ -5,7 +5,6 @@ import { auth } from '@/auth'
 import { getChat } from '@/app/actions'
 import { Chat } from '@/components/chat'
 
-export const runtime = 'edge'
 export const preferredRegion = 'home'
 
 export interface ChatPageProps {
@@ -37,12 +36,12 @@ export default async function ChatPage({ params }: ChatPageProps) {
   }
 
   const chat = await getChat(params.id, session.user.id)
-
+  console.log(chat);
   if (!chat) {
     notFound()
   }
 
-  if (chat?.userId !== session?.user?.id) {
+  if (chat?.userId != session?.user?.id) {
     notFound()
   }
 
