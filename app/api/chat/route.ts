@@ -8,7 +8,10 @@ import fs from "fs"
 import { type Chat } from '@/lib/types'
 import { VectorSearch } from '@/lib/vector'
 import { AutoblocksTracer } from '@autoblocks/client'
+import { AutoblocksPromptBuilder } from '@autoblocks/client/prompts'
+import { PromptTrackingId } from '@/lib/prompts'
 import crypto from 'crypto'
+
 
 
 const configuration = new Configuration({
@@ -31,13 +34,16 @@ export async function POST(req: Request) {
   const userId = (await auth())?.user.id
 
   const spanId = crypto.randomUUID()
+
+
   const requetsStart = Date.now()
   await tracer.sendEvent('ai.request', {
     spanId,
     properties: {
-      path: "/api/chat",
+      path: `/chat/${json.id ?? ""}`,
       user: userId,
-      messages: messages
+      messages: messages,
+      chatId: json.id ?? null
     },
   });
 
@@ -53,17 +59,23 @@ export async function POST(req: Request) {
 
   var userMessage : string = ""
   var userTags: string = ""
+
   if(messages.length == 1)
   {
     //get initial tags
-    userTags = await ExtractChatTags(openai, messages[0].content);
-    await tracer.sendEvent('ai.request.tags', {
-      spanId,
-      properties: {
-        model: 'gpt-3.5-turbo',
-        tags: userTags
-      },
-    });
+    const extractSpanId = crypto.randomUUID()
+
+    tracer.sendEvent("ai.extract.tags.start", {
+      spanId: extractSpanId,
+      parentSpanId: spanId
+    })
+
+    userTags = await ExtractChatTags(openai, messages[0].content, extractSpanId, tracer);
+
+    tracer.sendEvent("ai.extract.tags.end", {
+      spanId: extractSpanId,
+      parentSpanId: spanId
+    })
   }
   else if (json.id)
   {
@@ -72,13 +84,15 @@ export async function POST(req: Request) {
     userTags = chat?.tags ?? "";
   }
 
+  const builder = new AutoblocksPromptBuilder(PromptTrackingId.CHAT)
+  
   //set system prompt
   if(messages.length > 0 && messages[0].role != 'system')
   {
-    const systemPrompt = fs.readFileSync(process.env.SYSTEM_PROMPT_PATH ?? "",  'utf-8')
+    //const systemPrompt = fs.readFileSync(process.env.SYSTEM_PROMPT_PATH ?? "",  'utf-8')
     messages.unshift({
       role: 'system',
-      content: systemPrompt
+      content: builder.build('chat/system.txt', {})
     });
   }
 
@@ -95,24 +109,25 @@ export async function POST(req: Request) {
     
     Tags: ${userTags}
     `
+    const searchSpanId = crypto.randomUUID()
 
-    const context: string[] = await VectorSearch(openai, embeddingQuery)
-    await tracer.sendEvent('ai.request.context', {
-      spanId,
-      properties: {
-        model: 'text-embedding-ada-002',
-        context
-      },
-    });
+    tracer.sendEvent("ai.vector.search.start", {
+      spanId: searchSpanId,
+      parentSpanId: spanId
+    })
 
-    messages[messages.length-1].content = `
-    Remember, the following tags describe the user's skin and their skincare practices: ${userTags}. Consider these tags when answering the user's skincare question. DO NOT mention these tags to the user. 
+    const context: string[] = await VectorSearch(openai, embeddingQuery, searchSpanId, tracer)
 
-    Here is additional information to help you answer the user's question.
-    ${context.join("\n\n")}
+    tracer.sendEvent("ai.vector.search.end", {
+      spanId: searchSpanId,
+      parentSpanId: spanId
+    })
 
-    Here is the user's question:
-    ${userMessage}`
+    messages[messages.length-1].content = builder.build('chat/user.txt', {
+      userTags,
+      context: context.join("\n\n"),
+      userMessage
+    })
   }
   const res = await openai.createChatCompletion({
     model: 'gpt-3.5-turbo-16k',
@@ -124,7 +139,8 @@ export async function POST(req: Request) {
   const stream = OpenAIStream(res, {
     async onStart(){
       await tracer.sendEvent('ai.stream.start', {
-        spanId,
+        spanId: `${spanId}-a`,
+        parentSpanId: spanId,
         properties: {
           model: 'gpt-3.5-turbo-16k',
         }
@@ -162,6 +178,7 @@ export async function POST(req: Request) {
         properties: {
           ...payload
         },
+        promptTracking: builder.usage(),
       });
     }
   })

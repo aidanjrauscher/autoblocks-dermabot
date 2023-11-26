@@ -3,11 +3,13 @@
   "version": "0.0.2",
   "private": true,
   "scripts": {
+    "gen": "autoblocks prompts generate",
+    "gen:watch": "nodemon --quiet --watch prompt-templates --ext \"*\" --exec \"npm run gen\"",
     "process": "node app/scripts/process.js",
     "dev": "next dev",
-    "local": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "local": "npm run gen && next dev",
+    "build": "npm run gen && next build",
+    "start": "npm run gen && next start",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
     "preview": "next build && next start",
@@ -41,6 +43,7 @@
     "next": "13.4.7-canary.1",
     "next-auth": "0.0.0-manual.83c4ebd1",
     "next-themes": "^0.2.1",
+    "nodemon": "^3.0.1",
     "openai": "^4.19.1",
     "openai-edge": "^0.5.1",
     "react": "^18.2.0",
@@ -71,6 +74,9 @@
     "tailwindcss": "^3.3.1",
     "tailwindcss-animate": "^1.0.5",
     "typescript": "^5.1.3"
+  },
+  "autoblocks": {
+    "templatesDirectory": "prompts"
   },
   "packageManager": "pnpm@8.6.3"
 }

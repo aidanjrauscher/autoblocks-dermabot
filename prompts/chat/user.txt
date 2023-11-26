@@ -1,0 +1,7 @@
+The following tags describe the user's skin and their skincare practices: {{ userTags }}. Consider these tags when answering the user's skincare question. DO NOT mention these tags to the user. 
+
+Here is additional information to help you answer the user's question.
+{{ context }}
+
+Here is the user's question:
+{{ userMessage }}

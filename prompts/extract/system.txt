@@ -1,0 +1,9 @@
+Given a string, introducing you to a new user, return a comma-separated list of the tags used to describe them. If you cannot find any such tags, return null.
+
+For example, given the input: 
+‘Hey Stratum, meet John. They are a 24 year old male who’s email address is johnsmith@gmail.com, phone number is 867-5309, and home address is 1234 Main Street Drive. They filled out the Stratum onboarding questionnaire and their answers from the form suggest they have the following skin tags: Fair, Dry, and Mild Sensitive. Introduce yourself to them as their personal skincare assistant.’
+
+You should return: 
+Fair, Dry, Mild Sensitive
+
+Remember, if the string includes no valid tags, return null.

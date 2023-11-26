@@ -6,6 +6,9 @@ import { kv } from '@vercel/kv'
 import { auth } from '@/auth'
 import { type Chat } from '@/lib/types'
 import { OpenAIApi } from 'openai-edge'
+import { AutoblocksTracer } from '@autoblocks/client'
+import { AutoblocksPromptBuilder } from '@autoblocks/client/prompts'
+import { PromptTrackingId } from '@/lib/prompts'
 
 export async function getChats(userId?: string | null) {
   if (!userId) {
@@ -122,16 +125,17 @@ export async function ExtractChatName(prompt: string){
   return ""
 }
 
-export async function ExtractChatTags(openai: OpenAIApi, prompt: string){
+export async function ExtractChatTags(openai: OpenAIApi, prompt: string, extractSpanId: string, tracer: AutoblocksTracer){
+  const builder = new AutoblocksPromptBuilder(PromptTrackingId.EXTRACT)
   const messages : any = [
     {
-      content: 
-      `
+      //content: builder.build('extract/system.txt', {}),
+      content: `
       Given a string, introducing you to a new user, return a comma-separated list of the tags used to describe them. If you cannot find any such tags, return 'null'.
 
       For example, given the input: 
       ‘Hey Stratum, meet John. They are a 24 year old male who’s email address is johnsmith@gmail.com, phone number is 867-5309, and home address is 1234 Main Street Drive. They filled out the Stratum onboarding questionnaire and their answers from the form suggest they have the following skin tags: Fair, Dry, and Mild Sensitive. Introduce yourself to them as their personal skincare assistant.’
-      
+
       You should return: 
       Fair, Dry, Mild Sensitive
 
@@ -145,12 +149,33 @@ export async function ExtractChatTags(openai: OpenAIApi, prompt: string){
     }
   ]
 
-  const res = await openai.createChatCompletion({
+  const completionConfig = {
     model: 'gpt-3.5-turbo',
     messages,
     temperature: 0.3,
-  })
+  }
+
+  await tracer.sendEvent('ai.extract.tags.completion', {
+    spanId: `${extractSpanId}-a`,
+    parentSpanId: extractSpanId,
+    properties: {
+      ...completionConfig
+    },
+    promptTracking: builder.usage(),
+  });
+
+  const res = await openai.createChatCompletion(completionConfig)
 
   const data = await res.json()
-  return data.choices[0].message.content
+  const tags = data.choices[0].message.content
+
+  await tracer.sendEvent('ai.extract.tags.result', {
+    spanId: `${extractSpanId}-b`,    
+    parentSpanId: extractSpanId,
+    properties: {
+      tags
+    }
+  });
+
+  return tags
 }

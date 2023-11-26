@@ -37,5 +37,5 @@ yarn-error.log*
 .vercel
 .vscode
 
-app/prompts/
+prompts/chat/system.txt
 app/data/
